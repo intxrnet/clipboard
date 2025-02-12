@@ -1,0 +1,13 @@
+{
+  "name": "clipboard",
+  "items": [
+    {
+      "text": "to txt",
+      "description": "save snippet as plain text"
+    },
+    {
+      "text": "to img",
+      "description": "capture clipboard into an image"
+    }
+  ]
+}
