@@ -1,76 +1,56 @@
-import type { Metadata } from "next";
+import { Metadata } from "next";
 import { IBM_Plex_Sans } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
+import {
+  title,
+  siteMetadata,
+  openGraph,
+  twitter,
+  icons,
+  keywords,
+  robotsConfig,
+} from "./metadata";
+import { Robots } from "next/dist/lib/metadata/types/metadata-types";
 
 const ibmPlex = IBM_Plex_Sans({
   subsets: ["latin"],
+  variable: "--font-ibm-plex-sans",
   weight: ["400", "500", "600", "700"],
-  variable: "--font-ibm-plex",
 });
 
-//!! CHANGE ME
-const sub = "clipboard";
-const domain = `https://${sub}.intxr.net`;
-
 export const metadata: Metadata = {
-  title: `${sub} intxrnet`,
-  description: "Free, Open-Source, Client-Side Web Tools",
-  keywords:
-    "web tools, open source, client-side, development tools, browser tools",
-  authors: [{ name: "intxrnet" }],
-  openGraph: {
-    type: "website",
-    locale: "en_US",
-    url: domain,
-    siteName: `${sub} intxrnet`,
-    title: `${sub} intxrnet`,
-    description: "Free, Open-Source, Client-Side Web Tools",
-    images: [
-      {
-        url: "/image.png",
-        width: 800,
-        height: 800,
-        alt: `${sub} intxrnet - Free, Open-Source, Client-Side Web Tools`,
-      },
-    ],
+  metadataBase: new URL(siteMetadata.siteUrl),
+  title: {
+    default: siteMetadata.title + " / intxr",
+    template: `%s | ${siteMetadata.title} / intxr`,
   },
-  twitter: {
-    card: "summary_large_image",
-    title: `${sub} intxrnet`,
-    description: "Free, Open-Source, Client-Side Web Tools",
-    images: ["/icon.png"],
-    creator: "@intxrnet",
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-    },
-  },
+  description: siteMetadata.description,
+  keywords: keywords,
+  authors: [{ name: siteMetadata.author, url: siteMetadata.authorUrl }],
+  creator: siteMetadata.author,
+
+  // Open Graph
+  openGraph,
+
+  // Twitter
+  twitter,
+
+  // Icons
+  icons,
+
+  // Manifest
   manifest: "/manifest.json",
-  icons: {
-    icon: "/favicon.ico",
-    shortcut: "/icon.png",
-    apple: "/icon.png",
-  },
-  alternates: {
-    canonical: "https://www.intxr.net",
-  },
-  metadataBase: new URL("https://www.intxr.net"),
+  // Robots - use the imported config instead of duplicating
+  robots: robotsConfig as Robots,
 };
 
 function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 h-16 flex items-center bg-background z-10 px-4">
       <h1 className="text-xl flex-1 flex justify-end">
-        <Link href={`https://${sub}.intxr.net`} className="hover:underline">
-          {`${sub}`}
+        <Link href="/" className="hover:underline">
+          {`${title}`}
         </Link>
       </h1>
       <h1 className="text-xl">
@@ -91,7 +71,7 @@ function Header() {
 
 function Footer() {
   return (
-    <footer className="fixed bottom-2 left-0 right-0 h-8 flex justify-between items-center px-4 text-gray-500 bg-background z-10">
+    <footer className="fixed bottom-0 left-0 right-0 h-8 flex justify-between items-center px-4 text-gray-500 bg-background z-10">
       <Link
         href="https://github.com/intxrnet"
         className="hover:underline"
@@ -112,14 +92,14 @@ function Footer() {
   );
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en" className={ibmPlex.variable}>
-      <body className="flex flex-col min-h-screen overflow-hidden">
+      <body className="flex flex-col min-h-screen">
         <Header />
         <div className="h-16" aria-hidden="true"></div>
         <main className="flex-1 flex flex-col">{children}</main>

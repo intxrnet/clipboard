@@ -1,0 +1,46 @@
+name: Fetch Cloud Data
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - dev
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get repository name
+        id: repo_name
+        run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+
+      - name: Fetch cloud data
+        run: |
+          mkdir -p src/app/components
+          curl -sS "https://www.intxr.net/api/clouddata/${{ env.REPO_NAME }}" | jq '.' > src/app/components/content.json
+
+      - name: Check for changes
+        id: check_diff
+        run: |
+          git add src/app/components/content.json
+          if git diff --cached --quiet; then
+            echo "CHANGED=false" >> $GITHUB_ENV
+          else
+            echo "CHANGED=true" >> $GITHUB_ENV
+          fi
+
+      - name: Commit and push changes
+        if: env.CHANGED == 'true'
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git commit -m "Auto-update content.json from cloud data"
+          git push
