@@ -1,9 +1,22 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import Cropper from "react-cropper";
+import Cropper, { ReactCropperElement } from "react-cropper";
 import "cropperjs/dist/cropper.css";
 import { Copy, Download, Trash2, RefreshCw } from "lucide-react";
+
+// Define types for the cropper instance
+type CropperInstance = {
+  cropper: {
+    zoomTo: (value: number) => void;
+    setAspectRatio: (ratio: number | undefined) => void;
+    crop: () => void;
+    getData: () => { width: number; height: number };
+    getCroppedCanvas: (options?: {
+      fillColor?: string;
+    }) => HTMLCanvasElement | null;
+  };
+};
 
 const ClipboardImagePlayground = () => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -13,7 +26,7 @@ const ClipboardImagePlayground = () => {
   const [currentCropRatio, setCurrentCropRatio] = useState<string>("");
   const ZOOM_STEP = 0.1;
 
-  const cropperRef = useRef<any>(null);
+  const cropperRef = useRef<ReactCropperElement & CropperInstance>(null);
 
   // Global paste support
   useEffect(() => {
@@ -168,12 +181,21 @@ const ClipboardImagePlayground = () => {
     setZoom(1);
   };
 
-  const handleZoomIn = () => {
-    setZoom((prev) => Math.min(prev + ZOOM_STEP, 3));
+  const handleZoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setZoom(Number(e.target.value));
   };
 
-  const handleZoomOut = () => {
-    setZoom((prev) => Math.max(prev - ZOOM_STEP, 0.5));
+  const handleFormatChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setExportFormat(e.target.value);
+  };
+
+  const handleAspectRatioChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    if (value === "free") {
+      setAspectRatio(undefined);
+    } else {
+      setAspectRatio(parseFloat(value));
+    }
   };
 
   return (
@@ -193,14 +215,7 @@ const ClipboardImagePlayground = () => {
             Aspect Ratio:
             <select
               value={aspectRatio?.toString() ?? "free"}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === "free") {
-                  setAspectRatio(undefined);
-                } else {
-                  setAspectRatio(parseFloat(value));
-                }
-              }}
+              onChange={handleAspectRatioChange}
               className="px-2 py-1 border rounded-md bg-white"
             >
               <option value="free">Free</option>
@@ -214,7 +229,7 @@ const ClipboardImagePlayground = () => {
             Format:
             <select
               value={exportFormat}
-              onChange={(e) => setExportFormat(e.target.value)}
+              onChange={handleFormatChange}
               className="px-2 py-1 border rounded-md bg-white"
             >
               <option value="png">PNG</option>
@@ -268,7 +283,9 @@ const ClipboardImagePlayground = () => {
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Zoom:</span>
               <button
-                onClick={handleZoomOut}
+                onClick={() =>
+                  setZoom((prev) => Math.max(prev - ZOOM_STEP, 0.5))
+                }
                 className="p-1 rounded hover:bg-gray-100"
                 disabled={zoom <= 0.5}
               >
@@ -280,11 +297,11 @@ const ClipboardImagePlayground = () => {
                 max={3}
                 step={ZOOM_STEP}
                 value={zoom}
-                onChange={(e) => setZoom(Number(e.target.value))}
+                onChange={handleZoomChange}
                 className="w-32"
               />
               <button
-                onClick={handleZoomIn}
+                onClick={() => setZoom((prev) => Math.min(prev + ZOOM_STEP, 3))}
                 className="p-1 rounded hover:bg-gray-100"
                 disabled={zoom >= 3}
               >
