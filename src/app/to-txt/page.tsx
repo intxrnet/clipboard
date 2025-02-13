@@ -39,10 +39,37 @@ const ClipboardPlayground = () => {
 
   const handlePaste = async () => {
     try {
-      const text = await navigator.clipboard.readText();
-      setText(text);
+      const clipboardText = await navigator.clipboard.readText();
+      setText((prev) => prev + clipboardText);
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+      }
     } catch (err) {
       console.error("Failed to read clipboard:", err);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.ctrlKey && e.key === "v") {
+      e.preventDefault();
+      navigator.clipboard.readText().then((clipText) => {
+        const start = e.currentTarget.selectionStart;
+        const end = e.currentTarget.selectionEnd;
+        const currentText = text;
+        const newText =
+          currentText.substring(0, start) +
+          clipText +
+          currentText.substring(end);
+        setText(newText);
+        // Set cursor position after paste
+        setTimeout(() => {
+          if (textareaRef.current) {
+            const newPosition = start + clipText.length;
+            textareaRef.current.selectionStart = newPosition;
+            textareaRef.current.selectionEnd = newPosition;
+          }
+        }, 0);
+      });
     }
   };
 
@@ -106,9 +133,9 @@ const ClipboardPlayground = () => {
       </div>
 
       <div className="flex-grow border rounded-lg overflow-hidden">
-        <div className="flex h-full">
+        <div className="flex h-full relative">
           {showLineNumbers && (
-            <div className="w-12 flex-shrink-0 bg-gray-50 overflow-hidden">
+            <div className="w-12 flex-shrink-0 bg-gray-50 overflow-hidden relative z-10">
               <div ref={lineNumbersRef} className="h-full overflow-y-hidden">
                 {lines.map((_, i) => (
                   <div
@@ -124,33 +151,47 @@ const ClipboardPlayground = () => {
             </div>
           )}
           <div className="relative flex-grow overflow-hidden">
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                backgroundImage: lines
-                  .map(
-                    (_, i) =>
-                      `linear-gradient(to bottom, ${
-                        i % 2 === 0 ? "#ffffff" : "#f3f4f6"
-                      } 0%, ${i % 2 === 0 ? "#ffffff" : "#f3f4f6"} 100%)`
-                  )
-                  .join(","),
-                backgroundPosition: lines
-                  .map((_, i) => `0 ${i * 24}px`)
-                  .join(","),
-                backgroundRepeat: "no-repeat",
-                backgroundSize: "100% 24px",
-              }}
-            />
             <textarea
               ref={textareaRef}
               value={text}
               onChange={handleTextChange}
+              onKeyDown={handleKeyDown}
               onScroll={handleScroll}
-              onPaste={(e) => setText(e.clipboardData.getData("text"))}
-              className={`w-full h-full p-2 font-mono text-sm resize-none outline-none bg-transparent leading-6 overflow-auto ${
+              onPaste={(e) => {
+                e.preventDefault();
+                const clipText = e.clipboardData.getData("text");
+                const start = e.currentTarget.selectionStart;
+                const end = e.currentTarget.selectionEnd;
+                const currentText = text;
+                const newText =
+                  currentText.substring(0, start) +
+                  clipText +
+                  currentText.substring(end);
+                setText(newText);
+                // Set cursor position after paste
+                setTimeout(() => {
+                  if (textareaRef.current) {
+                    const newPosition = start + clipText.length;
+                    textareaRef.current.selectionStart = newPosition;
+                    textareaRef.current.selectionEnd = newPosition;
+                  }
+                }, 0);
+              }}
+              className={`w-full h-full p-2 font-mono text-sm resize-none outline-none leading-6 overflow-auto relative z-10 ${
                 wordWrap ? "whitespace-pre-wrap" : "whitespace-pre"
               }`}
+              style={{
+                background: lines
+                  .map(
+                    (_, i) =>
+                      `linear-gradient(to bottom, ${
+                        i % 2 === 0 ? "#ffffff" : "#f3f4f6"
+                      } 0%, ${i % 2 === 0 ? "#ffffff" : "#f3f4f6"} 100%) 0 ${
+                        i * 24
+                      }px / 100% 24px no-repeat`
+                  )
+                  .join(","),
+              }}
               placeholder="Paste your text here or start typing..."
             />
           </div>
