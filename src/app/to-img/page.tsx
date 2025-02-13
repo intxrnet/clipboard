@@ -147,7 +147,7 @@ const ClipboardImagePlayground = () => {
     if (cropperRef.current && navigator.clipboard.write) {
       const canvas = getExportCanvas();
       if (!canvas) return;
-      canvas.toBlob(async (blob) => {
+      canvas.toBlob(async (blob: Blob | null) => {
         if (!blob) return;
         try {
           await navigator.clipboard.write([
