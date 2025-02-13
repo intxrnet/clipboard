@@ -6,18 +6,18 @@ import "cropperjs/dist/cropper.css";
 import { Copy, Download, Trash2, RefreshCw } from "lucide-react";
 
 const ClipboardImagePlayground = () => {
-  const [imageSrc, setImageSrc] = useState(null);
-  // Use a number for aspect ratio; NaN for free crop.
-  const [aspectRatio, setAspectRatio] = useState(4 / 3);
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [aspectRatio, setAspectRatio] = useState<number | undefined>(4 / 3);
   const [exportFormat, setExportFormat] = useState("png");
-  // Allow zoom out below 1 (0.5) and zoom in up to 3.
   const [zoom, setZoom] = useState(1);
+  const [currentCropRatio, setCurrentCropRatio] = useState<string>("");
+  const ZOOM_STEP = 0.1;
 
-  const cropperRef = useRef(null);
+  const cropperRef = useRef<any>(null);
 
-  // --- Global paste support (Ctrl+V) ---
+  // Global paste support
   useEffect(() => {
-    const handlePasteEvent = (e) => {
+    const handlePasteEvent = (e: ClipboardEvent) => {
       if (e.clipboardData) {
         const items = e.clipboardData.items;
         for (let i = 0; i < items.length; i++) {
@@ -33,12 +33,11 @@ const ClipboardImagePlayground = () => {
         }
       }
     };
-
     window.addEventListener("paste", handlePasteEvent);
     return () => window.removeEventListener("paste", handlePasteEvent);
   }, []);
 
-  // --- Button-triggered paste (for browsers that support navigator.clipboard.read) ---
+  // Button-triggered paste (for browsers that support navigator.clipboard.read)
   const handlePaste = async () => {
     try {
       if (navigator.clipboard.read) {
@@ -64,46 +63,70 @@ const ClipboardImagePlayground = () => {
     }
   };
 
-  // Update cropper zoom when slider changes
+  // Update zoom whenever the slider changes
   useEffect(() => {
-    if (cropperRef.current) {
+    if (cropperRef.current && cropperRef.current.cropper) {
       cropperRef.current.cropper.zoomTo(zoom);
     }
   }, [zoom]);
 
-  // Computes padding in pixels when zoomed out (< 1).
-  const computePadding = () => {
-    return zoom < 1 ? (1 - zoom) * 50 : 0; // adjust the multiplier as needed
+  // Update crop box when aspect ratio changes
+  useEffect(() => {
+    if (cropperRef.current && cropperRef.current.cropper) {
+      cropperRef.current.cropper.setAspectRatio(aspectRatio);
+      // Force an update of the crop box if needed
+      cropperRef.current.cropper.crop();
+    }
+  }, [aspectRatio]);
+
+  // Update the crop ratio indicator
+  const handleCrop = () => {
+    if (cropperRef.current && cropperRef.current.cropper) {
+      const data = cropperRef.current.cropper.getData();
+      if (data.height) {
+        const ratio = data.width / data.height;
+        setCurrentCropRatio(ratio.toFixed(2));
+      }
+    }
   };
 
-  // Helper to get the cropped canvas with black padding (if any)
+  // Create an export canvas that includes cropped image and pads it to square if needed.
+  // Also, pass fillColor so areas outside the image (black void) are rendered in black.
   const getExportCanvas = () => {
-    if (cropperRef.current) {
+    if (cropperRef.current && cropperRef.current.cropper) {
       const cropper = cropperRef.current.cropper;
-      const croppedCanvas = cropper.getCroppedCanvas();
+      const croppedCanvas = cropper.getCroppedCanvas({
+        fillColor: "black",
+      });
       if (!croppedCanvas) return null;
-      const paddingPx = computePadding();
-      if (paddingPx > 0) {
-        const newCanvas = document.createElement("canvas");
-        newCanvas.width = croppedCanvas.width + 2 * paddingPx;
-        newCanvas.height = croppedCanvas.height + 2 * paddingPx;
-        const ctx = newCanvas.getContext("2d");
-        ctx.fillStyle = "black";
-        ctx.fillRect(0, 0, newCanvas.width, newCanvas.height);
-        ctx.drawImage(croppedCanvas, paddingPx, paddingPx);
-        return newCanvas;
+      const width = croppedCanvas.width;
+      const height = croppedCanvas.height;
+      if (width === height) {
+        return croppedCanvas;
       }
-      return croppedCanvas;
+      // Create a square canvas with black background and center the cropped image.
+      const size = Math.max(width, height);
+      const paddedCanvas = document.createElement("canvas");
+      paddedCanvas.width = size;
+      paddedCanvas.height = size;
+      const ctx = paddedCanvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, size, size);
+      const dx = (size - width) / 2;
+      const dy = (size - height) / 2;
+      ctx.drawImage(croppedCanvas, dx, dy, width, height);
+      return paddedCanvas;
     }
     return null;
   };
 
-  // --- Export the cropped image with padding (if any) ---
+  // Export the cropped image as a file
   const handleExport = () => {
     const canvas = getExportCanvas();
     if (!canvas) return;
     canvas.toBlob(
-      (blob) => {
+      (blob: Blob | null) => {
         if (!blob) return;
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -119,7 +142,7 @@ const ClipboardImagePlayground = () => {
     );
   };
 
-  // --- Copy the cropped image with padding to clipboard ---
+  // Copy the cropped image to clipboard
   const handleCopy = async () => {
     if (cropperRef.current && navigator.clipboard.write) {
       const canvas = getExportCanvas();
@@ -145,6 +168,14 @@ const ClipboardImagePlayground = () => {
     setZoom(1);
   };
 
+  const handleZoomIn = () => {
+    setZoom((prev) => Math.min(prev + ZOOM_STEP, 3));
+  };
+
+  const handleZoomOut = () => {
+    setZoom((prev) => Math.max(prev - ZOOM_STEP, 0.5));
+  };
+
   return (
     <div className="flex flex-col h-[90vh] w-full p-4 bg-white">
       {/* Header */}
@@ -161,11 +192,11 @@ const ClipboardImagePlayground = () => {
           <label className="text-sm text-gray-600 flex items-center gap-1">
             Aspect Ratio:
             <select
-              value={isNaN(aspectRatio) ? "free" : aspectRatio}
+              value={aspectRatio?.toString() ?? "free"}
               onChange={(e) => {
                 const value = e.target.value;
                 if (value === "free") {
-                  setAspectRatio(NaN);
+                  setAspectRatio(undefined);
                 } else {
                   setAspectRatio(parseFloat(value));
                 }
@@ -174,9 +205,9 @@ const ClipboardImagePlayground = () => {
             >
               <option value="free">Free</option>
               <option value="1">1:1</option>
-              <option value={(4 / 3).toString()}>4:3</option>
-              <option value={(16 / 9).toString()}>16:9</option>
-              <option value={(3 / 2).toString()}>3:2</option>
+              <option value="1.3333333333333333">4:3</option>
+              <option value="1.7777777777777777">16:9</option>
+              <option value="1.5">3:2</option>
             </select>
           </label>
           <label className="text-sm text-gray-600 flex items-center gap-1">
@@ -200,26 +231,27 @@ const ClipboardImagePlayground = () => {
         style={{ backgroundColor: "black" }}
       >
         {imageSrc ? (
-          // Wrap Cropper in a div that adds padding when zoomed out.
-          <div
-            style={{
-              height: "100%",
-              width: "100%",
-              padding: computePadding(),
-              boxSizing: "border-box",
-            }}
-          >
+          <div className="relative h-full w-full bg-black">
             <Cropper
               src={imageSrc}
               ref={cropperRef}
+              // Use the proper event name ("crop" not "onCrop")
+              crop={handleCrop}
               style={{ height: "100%", width: "100%" }}
-              aspectRatio={isNaN(aspectRatio) ? NaN : aspectRatio}
+              aspectRatio={aspectRatio}
               guides={true}
               background={false}
-              viewMode={1}
+              viewMode={0} // Allow crop box to extend into the black void.
               autoCropArea={1}
               responsive={true}
               checkOrientation={false}
+              dragMode="move"
+              cropBoxMovable={true}
+              cropBoxResizable={true}
+              toggleDragModeOnDblclick={false}
+              minContainerWidth={100}
+              minContainerHeight={100}
+              center={true}
             />
           </div>
         ) : (
@@ -231,23 +263,43 @@ const ClipboardImagePlayground = () => {
 
       {/* Controls */}
       <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        {/* Zoom control */}
         {imageSrc && (
-          <label className="text-sm text-gray-600 flex items-center gap-2">
-            Zoom:
-            <input
-              type="range"
-              min={0.5}
-              max={3}
-              step={0.1}
-              value={zoom}
-              onChange={(e) => setZoom(Number(e.target.value))}
-              className="ml-2"
-            />
-          </label>
+          <div className="flex flex-col md:flex-row md:items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Zoom:</span>
+              <button
+                onClick={handleZoomOut}
+                className="p-1 rounded hover:bg-gray-100"
+                disabled={zoom <= 0.5}
+              >
+                -
+              </button>
+              <input
+                type="range"
+                min={0.5}
+                max={3}
+                step={ZOOM_STEP}
+                value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+                className="w-32"
+              />
+              <button
+                onClick={handleZoomIn}
+                className="p-1 rounded hover:bg-gray-100"
+                disabled={zoom >= 3}
+              >
+                +
+              </button>
+              <span className="text-sm text-gray-600 min-w-[3ch]">
+                {Math.round(zoom * 100)}%
+              </span>
+            </div>
+            <div className="text-sm text-gray-600">
+              Current Crop Ratio: {currentCropRatio || "N/A"}
+            </div>
+          </div>
         )}
 
-        {/* Action Buttons */}
         <div className="flex items-center gap-2">
           {imageSrc && (
             <>
