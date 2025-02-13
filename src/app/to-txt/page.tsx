@@ -7,6 +7,7 @@ const ClipboardPlayground = () => {
   const [text, setText] = useState("");
   const [showLineNumbers, setShowLineNumbers] = useState(true);
   const [wordWrap, setWordWrap] = useState(false);
+  const [scrollTop, setScrollTop] = useState(0);
   const [statistics, setStatistics] = useState({
     lines: 0,
     words: 0,
@@ -32,8 +33,10 @@ const ClipboardPlayground = () => {
   };
 
   const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    const newScrollTop = e.currentTarget.scrollTop;
+    setScrollTop(newScrollTop);
     if (lineNumbersRef.current) {
-      lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop;
+      lineNumbersRef.current.scrollTop = newScrollTop;
     }
   };
 
@@ -41,9 +44,14 @@ const ClipboardPlayground = () => {
     try {
       const clipboardText = await navigator.clipboard.readText();
       setText((prev) => prev + clipboardText);
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-      }
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          const newPosition = text.length + clipboardText.length;
+          textareaRef.current.selectionStart = newPosition;
+          textareaRef.current.selectionEnd = newPosition;
+        }
+      }, 0);
     } catch (err) {
       console.error("Failed to read clipboard:", err);
     }
@@ -53,18 +61,13 @@ const ClipboardPlayground = () => {
     if (e.ctrlKey && e.key === "v") {
       e.preventDefault();
       navigator.clipboard.readText().then((clipText) => {
-        const start = e.currentTarget.selectionStart;
-        const end = e.currentTarget.selectionEnd;
         const currentText = text;
-        const newText =
-          currentText.substring(0, start) +
-          clipText +
-          currentText.substring(end);
+        const newText = currentText + clipText;
         setText(newText);
-        // Set cursor position after paste
+        // Set cursor position to end of pasted text
         setTimeout(() => {
           if (textareaRef.current) {
-            const newPosition = start + clipText.length;
+            const newPosition = newText.length;
             textareaRef.current.selectionStart = newPosition;
             textareaRef.current.selectionEnd = newPosition;
           }
@@ -151,6 +154,24 @@ const ClipboardPlayground = () => {
             </div>
           )}
           <div className="relative flex-grow overflow-hidden">
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                backgroundImage: lines
+                  .map(
+                    (_, i) =>
+                      `linear-gradient(to bottom, ${
+                        i % 2 === 0 ? "#ffffff" : "#f3f4f6"
+                      } 0%, ${i % 2 === 0 ? "#ffffff" : "#f3f4f6"} 100%)`
+                  )
+                  .join(","),
+                backgroundPosition: lines
+                  .map((_, i) => `0 ${i * 24 - scrollTop}px`)
+                  .join(","),
+                backgroundRepeat: "no-repeat",
+                backgroundSize: "100% 24px",
+              }}
+            />
             <textarea
               ref={textareaRef}
               value={text}
@@ -160,38 +181,21 @@ const ClipboardPlayground = () => {
               onPaste={(e) => {
                 e.preventDefault();
                 const clipText = e.clipboardData.getData("text");
-                const start = e.currentTarget.selectionStart;
-                const end = e.currentTarget.selectionEnd;
                 const currentText = text;
-                const newText =
-                  currentText.substring(0, start) +
-                  clipText +
-                  currentText.substring(end);
+                const newText = currentText + clipText;
                 setText(newText);
-                // Set cursor position after paste
+                // Set cursor position to end of pasted text
                 setTimeout(() => {
                   if (textareaRef.current) {
-                    const newPosition = start + clipText.length;
+                    const newPosition = newText.length;
                     textareaRef.current.selectionStart = newPosition;
                     textareaRef.current.selectionEnd = newPosition;
                   }
                 }, 0);
               }}
-              className={`w-full h-full p-2 font-mono text-sm resize-none outline-none leading-6 overflow-auto relative z-10 ${
+              className={`w-full h-full p-2 font-mono text-sm resize-none outline-none leading-6 overflow-auto relative z-10 bg-transparent ${
                 wordWrap ? "whitespace-pre-wrap" : "whitespace-pre"
               }`}
-              style={{
-                background: lines
-                  .map(
-                    (_, i) =>
-                      `linear-gradient(to bottom, ${
-                        i % 2 === 0 ? "#ffffff" : "#f3f4f6"
-                      } 0%, ${i % 2 === 0 ? "#ffffff" : "#f3f4f6"} 100%) 0 ${
-                        i * 24
-                      }px / 100% 24px no-repeat`
-                  )
-                  .join(","),
-              }}
               placeholder="Paste your text here or start typing..."
             />
           </div>
